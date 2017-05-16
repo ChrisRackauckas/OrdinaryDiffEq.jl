@@ -1,6 +1,6 @@
-abstract OrdinaryDiffEqAlgorithm <: AbstractODEAlgorithm
-abstract OrdinaryDiffEqAdaptiveAlgorithm <: OrdinaryDiffEqAlgorithm
-abstract OrdinaryDiffEqCompositeAlgorithm <: OrdinaryDiffEqAlgorithm
+@compat abstract type OrdinaryDiffEqAlgorithm <: AbstractODEAlgorithm end
+@compat abstract type OrdinaryDiffEqAdaptiveAlgorithm <: OrdinaryDiffEqAlgorithm end
+@compat abstract type OrdinaryDiffEqCompositeAlgorithm <: OrdinaryDiffEqAlgorithm end
 
 immutable Discrete{apply_map,scale_by_time} <: OrdinaryDiffEqAlgorithm end
 
@@ -9,6 +9,15 @@ Base.@pure FunctionMap(;scale_by_time=false) = Discrete{true,scale_by_time}()
 immutable Euler <: OrdinaryDiffEqAlgorithm end
 immutable Midpoint <: OrdinaryDiffEqAlgorithm end
 immutable RK4 <: OrdinaryDiffEqAlgorithm end
+immutable SSPRK22 <: OrdinaryDiffEqAlgorithm end
+immutable SSPRK33 <: OrdinaryDiffEqAlgorithm end
+immutable SSPRK104 <: OrdinaryDiffEqAlgorithm end
+
+#immutable Verlet <: OrdinaryDiffEqAlgorithm end
+immutable SymplecticEuler <: OrdinaryDiffEqAlgorithm end
+#immutable VelocityVerlet <: OrdinaryDiffEqAdaptiveAlgorithm end
+
+immutable SplitEuler <: OrdinaryDiffEqAlgorithm end
 
 @with_kw immutable ExplicitRK{TabType} <: OrdinaryDiffEqAdaptiveAlgorithm
   tableau::TabType=ODE_DEFAULT_TABLEAU
@@ -30,25 +39,40 @@ immutable Feagin10 <: OrdinaryDiffEqAdaptiveAlgorithm end
 immutable Feagin12 <: OrdinaryDiffEqAdaptiveAlgorithm end
 immutable Feagin14 <: OrdinaryDiffEqAdaptiveAlgorithm end
 
-immutable ImplicitEuler{CS,AD,F} <: OrdinaryDiffEqAlgorithm
-  factorization::F
+immutable ImplicitEuler{F} <: OrdinaryDiffEqAlgorithm
+  nlsolve::F
 end
-Base.@pure ImplicitEuler(;chunk_size=0,autodiff=true,factorization=lufact!) = ImplicitEuler{chunk_size,autodiff,typeof(factorization)}(factorization)
+Base.@pure ImplicitEuler(;nlsolve=NLSOLVEJL_SETUP()) = ImplicitEuler{typeof(nlsolve)}(nlsolve)
 
-immutable Trapezoid{CS,AD,F} <: OrdinaryDiffEqAlgorithm
-  factorization::F
+immutable Trapezoid{F} <: OrdinaryDiffEqAlgorithm
+  nlsolve::F
 end
-Base.@pure Trapezoid(;chunk_size=0,autodiff=true,factorization=lufact!) = Trapezoid{chunk_size,autodiff,typeof(factorization)}(factorization)
+Base.@pure Trapezoid(;nlsolve=NLSOLVEJL_SETUP()) = Trapezoid{typeof(nlsolve)}(nlsolve)
 
 immutable Rosenbrock23{CS,AD,F} <: OrdinaryDiffEqAdaptiveAlgorithm
-  factorization::F
+  linsolve::F
+  diff_type::Symbol
 end
-Base.@pure Rosenbrock23(;chunk_size=0,autodiff=true,factorization=lufact!) = Rosenbrock23{chunk_size,autodiff,typeof(factorization)}(factorization)
+Base.@pure Rosenbrock23(;chunk_size=0,autodiff=true,diff_type=:central,linsolve=DEFAULT_LINSOLVE) = Rosenbrock23{chunk_size,autodiff,typeof(linsolve)}(linsolve,diff_type)
 
 immutable Rosenbrock32{CS,AD,F} <: OrdinaryDiffEqAdaptiveAlgorithm
-  factorization::F
+  linsolve::F
+  diff_type::Symbol
 end
-Base.@pure Rosenbrock32(;chunk_size=0,autodiff=true,factorization=lufact!) = Rosenbrock32{chunk_size,autodiff,typeof(factorization)}(factorization)
+Base.@pure Rosenbrock32(;chunk_size=0,autodiff=true,diff_type=:central,linsolve=DEFAULT_LINSOLVE) = Rosenbrock32{chunk_size,autodiff,typeof(linsolve)}(linsolve,diff_type)
+
+immutable IIF1{F} <: OrdinaryDiffEqAlgorithm
+  nlsolve::F
+end
+Base.@pure IIF1(;nlsolve=NLSOLVEJL_SETUP()) = IIF1{typeof(nlsolve)}(nlsolve)
+
+immutable IIF2{F} <: OrdinaryDiffEqAlgorithm
+  nlsolve::F
+end
+Base.@pure IIF2(;nlsolve=NLSOLVEJL_SETUP()) = IIF2{typeof(nlsolve)}(nlsolve)
+
+immutable LawsonEuler <: OrdinaryDiffEqAlgorithm end
+immutable NorsettEuler <: OrdinaryDiffEqAlgorithm end
 
 immutable GeneralRosenbrock{CS,AD,F,TabType} <: OrdinaryDiffEqAdaptiveAlgorithm
   tableau::TabType

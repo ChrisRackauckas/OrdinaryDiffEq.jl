@@ -1,4 +1,4 @@
-initialize{uType}(integrator,cache::OrdinaryDiffEqCache,::Type{uType}) =
+save_idxsinitialize{uType}(integrator,cache::OrdinaryDiffEqCache,::Type{uType}) =
                 error("This algorithm does not have an initialization function")
 
 @inline function loopheader!(integrator)
@@ -30,6 +30,7 @@ end
       warn("Interrupted. Larger maxiters is needed.")
     end
     postamble!(integrator)
+    integrator.sol.retcode = :MaxIters
     return integrator.sol
   end
   if !integrator.opts.force_dtmin && integrator.opts.adaptive && abs(integrator.dt) <= abs(integrator.opts.dtmin)
@@ -37,6 +38,7 @@ end
       warn("dt <= dtmin. Aborting. If you would like to force continuation with dt=dtmin, set force_dtmin=true")
     end
     postamble!(integrator)
+    integrator.sol.retcode = :DtLessThanMin
     return integrator.sol
   end
   if integrator.opts.unstable_check(integrator.dt,integrator.t,integrator.u)
@@ -44,6 +46,7 @@ end
       warn("Instability detected. Aborting")
     end
     postamble!(integrator)
+    integrator.sol.retcode = :Unstable
     return integrator.sol
   end
 end
@@ -72,20 +75,33 @@ end
     if curt!=integrator.t # If <t, interpolate
       ode_addsteps!(integrator)
       Θ = (curt - integrator.tprev)/integrator.dt
-      val = ode_interpolant(Θ,integrator,indices(integrator.uprev),Val{0}) # out of place, but no force copy later
+      if integrator.opts.save_idxs == nothing
+        val = ode_interpolant(Θ,integrator,indices(integrator.uprev),Val{0}) # out of place, but no force copy later
+      else
+        val = ode_interpolant(Θ,integrator,integrator.opts.save_idxs,Val{0}) # out of place, but no force copy later
+      end
       copyat_or_push!(integrator.sol.t,integrator.saveiter,curt)
-      copyat_or_push!(integrator.sol.u,integrator.saveiter,val,Val{false})
+      save_val = val
+      copyat_or_push!(integrator.sol.u,integrator.saveiter,save_val,Val{false})
       if typeof(integrator.alg) <: OrdinaryDiffEqCompositeAlgorithm
         copyat_or_push!(integrator.sol.alg_choice,integrator.saveiter,integrator.cache.current)
       end
     else # ==t, just save
       copyat_or_push!(integrator.sol.t,integrator.saveiter,integrator.t)
-      copyat_or_push!(integrator.sol.u,integrator.saveiter,integrator.u)
+      if integrator.opts.save_idxs ==nothing
+        copyat_or_push!(integrator.sol.u,integrator.saveiter,integrator.u)
+      else
+        copyat_or_push!(integrator.sol.u,integrator.saveiter,integrator.u[integrator.opts.save_idxs],Val{false})
+      end
       if typeof(integrator.alg) <: Discrete || integrator.opts.dense
         integrator.saveiter_dense +=1
         copyat_or_push!(integrator.notsaveat_idxs,integrator.saveiter_dense,integrator.saveiter)
         if integrator.opts.dense
-          copyat_or_push!(integrator.sol.k,integrator.saveiter_dense,integrator.k)
+          if integrator.opts.save_idxs ==nothing
+            copyat_or_push!(integrator.sol.k,integrator.saveiter_dense,integrator.k)
+          else
+            copyat_or_push!(integrator.sol.k,integrator.saveiter_dense,[k[integrator.opts.save_idxs] for k in integrator.k],Val{false})
+          end
         end
       end
       if typeof(integrator.alg) <: OrdinaryDiffEqCompositeAlgorithm
@@ -93,15 +109,23 @@ end
       end
     end
   end
-  if integrator.opts.save_timeseries && integrator.iter%integrator.opts.timeseries_steps==0
+  if integrator.opts.save_everystep && integrator.iter%integrator.opts.timeseries_steps==0
     integrator.saveiter += 1
-    copyat_or_push!(integrator.sol.u,integrator.saveiter,integrator.u)
+    if integrator.opts.save_idxs == nothing
+      copyat_or_push!(integrator.sol.u,integrator.saveiter,integrator.u)
+    else
+      copyat_or_push!(integrator.sol.u,integrator.saveiter,integrator.u[integrator.opts.save_idxs],Val{false})
+    end
     copyat_or_push!(integrator.sol.t,integrator.saveiter,integrator.t)
     if typeof(integrator.alg) <: Discrete || integrator.opts.dense
       integrator.saveiter_dense +=1
       copyat_or_push!(integrator.notsaveat_idxs,integrator.saveiter_dense,integrator.saveiter)
       if integrator.opts.dense
-        copyat_or_push!(integrator.sol.k,integrator.saveiter_dense,integrator.k)
+        if integrator.opts.save_idxs == nothing
+          copyat_or_push!(integrator.sol.k,integrator.saveiter_dense,integrator.k)
+        else
+          copyat_or_push!(integrator.sol.k,integrator.saveiter_dense,[k[integrator.opts.save_idxs] for k in integrator.k],Val{false})
+        end
       end
     end
     if typeof(integrator.alg) <: OrdinaryDiffEqCompositeAlgorithm
@@ -123,12 +147,20 @@ end
   if integrator.sol.t[integrator.saveiter] !=  integrator.t
     integrator.saveiter += 1
     copyat_or_push!(integrator.sol.t,integrator.saveiter,integrator.t)
-    copyat_or_push!(integrator.sol.u,integrator.saveiter,integrator.u)
+    if integrator.opts.save_idxs == nothing
+      copyat_or_push!(integrator.sol.u,integrator.saveiter,integrator.u)
+    else
+      copyat_or_push!(integrator.sol.u,integrator.saveiter,integrator.u[integrator.opts.save_idxs],Val{false})
+    end
     if typeof(integrator.alg) <: Discrete || integrator.opts.dense
       integrator.saveiter_dense +=1
       copyat_or_push!(integrator.notsaveat_idxs,integrator.saveiter_dense,integrator.saveiter)
       if integrator.opts.dense
-        copyat_or_push!(integrator.sol.k,integrator.saveiter_dense,integrator.k)
+        if integrator.opts.save_idxs == nothing
+          copyat_or_push!(integrator.sol.k,integrator.saveiter_dense,integrator.k)
+        else
+          copyat_or_push!(integrator.sol.k,integrator.saveiter_dense,[k[integrator.opts.save_idxs] for k in integrator.k],Val{false})
+        end
       end
     end
   end
@@ -201,13 +233,13 @@ end
 
   #Update uprev
   if alg_extrapolates(integrator.alg)
-    if typeof(integrator.u) <: AbstractArray
+    if isinplace(integrator.sol.prob)
       recursivecopy!(integrator.uprev2,integrator.uprev)
     else
       integrator.uprev2 = integrator.uprev
     end
   end
-  if typeof(integrator.u) <: AbstractArray
+  if isinplace(integrator.sol.prob)
     recursivecopy!(integrator.uprev,integrator.u)
   else
     integrator.uprev = integrator.u
@@ -215,8 +247,8 @@ end
 
   #Update dt if adaptive or if fixed and the dt is allowed to change
   if integrator.opts.adaptive || integrator.dtchangeable
-    integrator.dt = integrator.dt_mod*integrator.dtpropose
-  elseif integrator.dt != integrator.dt_mod*integrator.dtpropose && !integrator.dtchangeable
+    integrator.dt = integrator.dtpropose
+  elseif integrator.dt != integrator.dtpropose && !integrator.dtchangeable
     error("The current setup does not allow for changing dt.")
   end
 
@@ -228,14 +260,13 @@ end
     elseif integrator.reeval_fsal || (typeof(integrator.alg)<:DP8 && !integrator.opts.calck) || (typeof(integrator.alg)<:Union{Rosenbrock23,Rosenbrock32} && !integrator.opts.adaptive)
       reset_fsal!(integrator)
     else # Do not reeval_fsal, instead copy! over
-      if typeof(integrator.fsalfirst) <: AbstractArray
+      if isinplace(integrator.sol.prob)
         recursivecopy!(integrator.fsalfirst,integrator.fsallast)
       else
         integrator.fsalfirst = integrator.fsallast
       end
     end
   end
-  integrator.dt_mod = one(typeof(integrator.t))
 end
 
 

@@ -1,3 +1,5 @@
+isautodifferentiable(alg::OrdinaryDiffEqAlgorithm) = true
+
 isfsal(alg::OrdinaryDiffEqAlgorithm) = false
 isfsal(alg::DP5) = true
 isfsal(alg::DP5Threaded) = true
@@ -8,9 +10,18 @@ isfsal(alg::Tsit5) = true
 isfsal(alg::Vern6) = true
 isfsal(alg::Rosenbrock23) = true
 isfsal(alg::Rosenbrock32) = true
+isfsal(alg::LawsonEuler) = true
+isfsal(alg::NorsettEuler) = true
 isfsal(alg::Euler) = true
+isfsal(alg::SplitEuler) = true
+isfsal(alg::SymplecticEuler) = true
 isfsal(alg::Midpoint) = true
+isfsal(alg::SSPRK22) = true
+isfsal(alg::SSPRK33) = true
+isfsal(alg::SSPRK104) = true
 isfsal(alg::RK4) = true
+isfsal(alg::IIF1) = true
+isfsal(alg::IIF2) = true
 isfsal(alg::Feagin10) = true
 isfsal(alg::Feagin12) = true
 isfsal(alg::Feagin14) = true
@@ -23,9 +34,15 @@ isfsal{MType,VType,fsal}(tab::ExplicitRKTableau{MType,VType,fsal}) = fsal
 #isfsal(tab::ImplicitRKTableau) = false
 isfsal(alg::CompositeAlgorithm) = true # Every algorithm is assumed FSAL. Good assumption?
 
+fsal_typeof(alg::OrdinaryDiffEqAlgorithm,rate_prototype) = typeof(rate_prototype)
+#fsal_typeof(alg::LawsonEuler,rate_prototype) = Vector{typeof(rate_prototype)}
+#fsal_typeof(alg::NorsettEuler,rate_prototype) = Vector{typeof(rate_prototype)}
+
 isimplicit(alg::OrdinaryDiffEqAlgorithm) = false
 isimplicit(alg::ImplicitEuler) = true
 isimplicit(alg::Trapezoid) = true
+isimplicit(alg::IIF1) = true
+isimplicit(alg::IIF2) = true
 
 isdtchangeable(alg::OrdinaryDiffEqAlgorithm) = true
 
@@ -42,8 +59,6 @@ qmax_default(alg::OrdinaryDiffEqAlgorithm) = 10
 qmax_default(alg::DP8) = 6
 
 get_chunksize(alg::OrdinaryDiffEqAlgorithm) = error("This algorithm does not have a chunk size defined.")
-get_chunksize{CS,AD}(alg::ImplicitEuler{CS,AD}) = CS
-get_chunksize{CS,AD}(alg::Trapezoid{CS,AD}) = CS
 get_chunksize{CS,AD}(alg::Rosenbrock23{CS,AD}) = CS
 get_chunksize{CS,AD}(alg::Rosenbrock32{CS,AD}) = CS
 
@@ -52,8 +67,6 @@ alg_extrapolates(alg::ImplicitEuler) = true
 alg_extrapolates(alg::Trapezoid) = true
 
 alg_autodiff(alg::OrdinaryDiffEqAlgorithm) = error("This algorithm does not have an autodifferentiation option defined.")
-alg_autodiff{CS,AD}(alg::ImplicitEuler{CS,AD}) = AD
-alg_autodiff{CS,AD}(alg::Trapezoid{CS,AD}) = AD
 alg_autodiff{CS,AD}(alg::Rosenbrock23{CS,AD}) = AD
 alg_autodiff{CS,AD}(alg::Rosenbrock32{CS,AD}) = AD
 
@@ -62,7 +75,16 @@ alg_adaptive_order(alg::OrdinaryDiffEqAdaptiveAlgorithm) = error("Algorithm is a
 
 alg_order(alg::Discrete) = 0
 alg_order(alg::Euler) = 1
+alg_order(alg::LawsonEuler) = 1
+alg_order(alg::NorsettEuler) = 1
+alg_order(alg::SplitEuler) = 1
+alg_order(alg::SymplecticEuler) = 1
 alg_order(alg::Midpoint) = 2
+alg_order(alg::IIF1) = 1
+alg_order(alg::IIF2) = 2
+alg_order(alg::SSPRK22) = 2
+alg_order(alg::SSPRK33) = 3
+alg_order(alg::SSPRK104) = 4
 alg_order(alg::RK4) = 4
 alg_order(alg::ExplicitRK) = alg.tableau.order
 alg_order(alg::BS3) = 3

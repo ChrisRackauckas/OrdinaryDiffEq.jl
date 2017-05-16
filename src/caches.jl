@@ -1,6 +1,6 @@
-abstract OrdinaryDiffEqCache <: DECache
-abstract OrdinaryDiffEqConstantCache <: OrdinaryDiffEqCache
-abstract OrdinaryDiffEqMutableCache <: OrdinaryDiffEqCache
+@compat abstract type OrdinaryDiffEqCache <: DECache end
+@compat abstract type OrdinaryDiffEqConstantCache <: OrdinaryDiffEqCache end
+@compat abstract type OrdinaryDiffEqMutableCache <: OrdinaryDiffEqCache end
 immutable ODEEmptyCache <: OrdinaryDiffEqConstantCache end
 immutable ODEChunkCache{CS} <: OrdinaryDiffEqConstantCache end
 
@@ -27,7 +27,7 @@ u_cache(c::DiscreteCache) = ()
 du_cache(c::DiscreteCache) = (c.du)
 
 function alg_cache(alg::Discrete,u,rate_prototype,uEltypeNoUnits,tTypeNoUnits,uprev,uprev2,f,t,::Type{Val{true}})
-  DiscreteCache(u,uprev,rate_prototype)
+  DiscreteCache(u,uprev,discrete_scale_by_time(alg) ? rate_prototype : similar(u))
 end
 
 immutable DiscreteConstantCache <: OrdinaryDiffEqConstantCache end
@@ -53,6 +53,44 @@ immutable EulerConstantCache <: OrdinaryDiffEqConstantCache end
 
 alg_cache(alg::Euler,u,rate_prototype,uEltypeNoUnits,tTypeNoUnits,uprev,uprev2,f,t,::Type{Val{false}}) = EulerConstantCache()
 
+immutable SplitEulerCache{uType,rateType} <: OrdinaryDiffEqMutableCache
+  u::uType
+  uprev::uType
+  tmp::uType
+  k::rateType
+  fsalfirst::rateType
+end
+
+function alg_cache(alg::SplitEuler,u,rate_prototype,uEltypeNoUnits,tTypeNoUnits,uprev,uprev2,f,t,::Type{Val{true}})
+  SplitEulerCache(u,uprev,similar(u),zeros(rate_prototype),zeros(rate_prototype))
+end
+
+u_cache(c::SplitEulerCache) = ()
+du_cache(c::SplitEulerCache) = (c.k,c.fsalfirst)
+
+immutable SplitEulerConstantCache <: OrdinaryDiffEqConstantCache end
+
+alg_cache(alg::SplitEuler,u,rate_prototype,uEltypeNoUnits,tTypeNoUnits,uprev,uprev2,f,t,::Type{Val{false}}) = SplitEulerConstantCache()
+
+immutable SymplecticEulerCache{uType,rateType} <: OrdinaryDiffEqMutableCache
+  u::uType
+  uprev::uType
+  tmp::uType
+  k::rateType
+  fsalfirst::rateType
+end
+
+function alg_cache(alg::SymplecticEuler,u,rate_prototype,uEltypeNoUnits,tTypeNoUnits,uprev,uprev2,f,t,::Type{Val{true}})
+  SymplecticEulerCache(u,uprev,similar(u),zeros(rate_prototype),zeros(rate_prototype))
+end
+
+u_cache(c::SymplecticEulerCache) = ()
+du_cache(c::SymplecticEulerCache) = (c.k,c.fsalfirst)
+
+immutable SymplecticEulerConstantCache <: OrdinaryDiffEqConstantCache end
+
+alg_cache(alg::SymplecticEuler,u,rate_prototype,uEltypeNoUnits,tTypeNoUnits,uprev,uprev2,f,t,::Type{Val{false}}) = SymplecticEulerConstantCache()
+
 immutable MidpointCache{uType,rateType} <: OrdinaryDiffEqMutableCache
   u::uType
   uprev::uType
@@ -76,6 +114,86 @@ function alg_cache(alg::Midpoint,u,rate_prototype,uEltypeNoUnits,tTypeNoUnits,up
 end
 
 alg_cache(alg::Midpoint,u,rate_prototype,uEltypeNoUnits,tTypeNoUnits,uprev,uprev2,f,t,::Type{Val{false}}) = MidpointConstantCache()
+
+
+immutable SSPRK22Cache{uType,rateType} <: OrdinaryDiffEqMutableCache
+  u::uType
+  uprev::uType
+  k::rateType
+  du::rateType
+  tmp::uType
+  fsalfirst::rateType
+end
+
+u_cache(c::SSPRK22Cache) = ()
+du_cache(c::SSPRK22Cache) = (c.k,c.du,c.fsalfirst)
+
+immutable SSPRK22ConstantCache <: OrdinaryDiffEqConstantCache end
+
+function alg_cache(alg::SSPRK22,u,rate_prototype,uEltypeNoUnits,tTypeNoUnits,uprev,uprev2,f,t,::Type{Val{true}})
+  tmp = similar(u)
+  k = zeros(rate_prototype)
+  du = zeros(rate_prototype)
+  fsalfirst = zeros(rate_prototype)
+  SSPRK22Cache(u,uprev,k,du,tmp,fsalfirst)
+end
+
+alg_cache(alg::SSPRK22,u,rate_prototype,uEltypeNoUnits,tTypeNoUnits,uprev,uprev2,f,t,::Type{Val{false}}) = SSPRK22ConstantCache()
+
+
+immutable SSPRK33Cache{uType,rateType} <: OrdinaryDiffEqMutableCache
+  u::uType
+  uprev::uType
+  k::rateType
+  du::rateType
+  tmp::uType
+  fsalfirst::rateType
+end
+
+u_cache(c::SSPRK33Cache) = ()
+du_cache(c::SSPRK33Cache) = (c.k,c.du,c.fsalfirst)
+
+immutable SSPRK33ConstantCache <: OrdinaryDiffEqConstantCache end
+
+function alg_cache(alg::SSPRK33,u,rate_prototype,uEltypeNoUnits,tTypeNoUnits,uprev,uprev2,f,t,::Type{Val{true}})
+  tmp = similar(u)
+  k = zeros(rate_prototype)
+  du = zeros(rate_prototype)
+  fsalfirst = zeros(rate_prototype)
+  SSPRK33Cache(u,uprev,k,du,tmp,fsalfirst)
+end
+
+alg_cache(alg::SSPRK33,u,rate_prototype,uEltypeNoUnits,tTypeNoUnits,uprev,uprev2,f,t,::Type{Val{false}}) = SSPRK33ConstantCache()
+
+
+immutable SSPRK104Cache{uType,rateType} <: OrdinaryDiffEqMutableCache
+  u::uType
+  uprev::uType
+  u₄::uType
+  k::rateType
+  k₄::rateType
+  du::rateType
+  tmp::uType
+  fsalfirst::rateType
+end
+
+u_cache(c::SSPRK104Cache) = (c.u₄,)
+du_cache(c::SSPRK104Cache) = (c.k,c.du,c.fsalfirst,c.k₄)
+
+immutable SSPRK104ConstantCache <: OrdinaryDiffEqConstantCache end
+
+function alg_cache(alg::SSPRK104,u,rate_prototype,uEltypeNoUnits,tTypeNoUnits,uprev,uprev2,f,t,::Type{Val{true}})
+  tmp = similar(u)
+  u₄ = similar(u)
+  k = zeros(rate_prototype)
+  k₄ = zeros(rate_prototype)
+  du = zeros(rate_prototype)
+  fsalfirst = zeros(rate_prototype)
+  SSPRK104Cache(u,uprev,u₄,k,k₄,du,tmp,fsalfirst)
+end
+
+alg_cache(alg::SSPRK104,u,rate_prototype,uEltypeNoUnits,tTypeNoUnits,uprev,uprev2,f,t,::Type{Val{false}}) = SSPRK104ConstantCache()
+
 
 immutable RK4Cache{uType,rateType} <: OrdinaryDiffEqMutableCache
   u::uType
@@ -251,7 +369,8 @@ function alg_cache(alg::DP5,u,rate_prototype,uEltypeNoUnits,tTypeNoUnits,uprev,u
   utilde = similar(u,indices(u))
   tmp = similar(u); atmp = similar(u,uEltypeNoUnits,indices(u))
   tab = DP5ConstantCache(realtype(uEltypeNoUnits),realtype(tTypeNoUnits))
-  DP5Cache(u,uprev,k1,k2,k3,k4,k5,k6,k7,dense_tmp3,dense_tmp4,update,bspl,utilde,tmp,atmp,tab)
+  cache = DP5Cache(u,uprev,k1,k2,k3,k4,k5,k6,k7,dense_tmp3,dense_tmp4,update,bspl,utilde,tmp,atmp,tab)
+  cache
 end
 
 alg_cache(alg::DP5,u,rate_prototype,uEltypeNoUnits,tTypeNoUnits,uprev,uprev2,f,t,::Type{Val{false}}) = DP5ConstantCache(realtype(uEltypeNoUnits),realtype(tTypeNoUnits))
@@ -806,14 +925,14 @@ end
 alg_cache(alg::Feagin14,u,rate_prototype,uEltypeNoUnits,tTypeNoUnits,uprev,uprev2,f,t,::Type{Val{false}}) = Feagin14ConstantCache(realtype(uEltypeNoUnits),realtype(tTypeNoUnits))
 
 
-type Rosenbrock23Cache{uType,uArrayType,rateType,vecuType,JType,TabType,TFType,UFType,F,JCType} <: OrdinaryDiffEqMutableCache
+type Rosenbrock23Cache{uType,uArrayType,rateType,du2Type,vecuType,JType,TabType,TFType,UFType,F,JCType} <: OrdinaryDiffEqMutableCache
   u::uType
   uprev::uType
   k₁::rateType
   k₂::rateType
   k₃::rateType
   du1::rateType
-  du2::rateType
+  du2::du2Type
   f₁::rateType
   vectmp::vecuType
   vectmp2::vecuType
@@ -828,7 +947,7 @@ type Rosenbrock23Cache{uType,uArrayType,rateType,vecuType,JType,TabType,TFType,U
   tf::TFType
   uf::UFType
   linsolve_tmp::vecuType
-  factorization::F
+  linsolve::F
   jac_config::JCType
 end
 
@@ -837,14 +956,14 @@ du_cache(c::Rosenbrock23Cache) = (c.k₁,c.k₂,c.k₃,c.du1,c.du2,c.f₁,c.fsal
 jac_cache(c::Rosenbrock23Cache) = (c.J,c.W)
 vecu_cache(c::Rosenbrock23Cache) = (c.vectmp,c.vectmp2,c.vectmp3)
 
-type Rosenbrock32Cache{uType,uArrayType,rateType,vecuType,JType,TabType,TFType,UFType,F,JCType} <: OrdinaryDiffEqMutableCache
+type Rosenbrock32Cache{uType,uArrayType,rateType,du2Type,vecuType,JType,TabType,TFType,UFType,F,JCType} <: OrdinaryDiffEqMutableCache
   u::uType
   uprev::uType
   k₁::rateType
   k₂::rateType
   k₃::rateType
   du1::rateType
-  du2::rateType
+  du2::du2Type
   f₁::rateType
   vectmp::vecuType
   vectmp2::vecuType
@@ -859,7 +978,7 @@ type Rosenbrock32Cache{uType,uArrayType,rateType,vecuType,JType,TabType,TFType,U
   tf::TFType
   uf::UFType
   linsolve_tmp::vecuType
-  factorization::F
+  linsolve::F
   jac_config::JCType
 end
 
@@ -873,7 +992,11 @@ function alg_cache(alg::Rosenbrock23,u,rate_prototype,uEltypeNoUnits,tTypeNoUnit
   k₂ = zeros(rate_prototype)
   k₃ = zeros(rate_prototype)
   du1 = zeros(rate_prototype)
-  du2 = zeros(rate_prototype)
+  if alg_autodiff(alg)
+    du2 = zeros(Dual{determine_chunksize(u,alg), eltype(u)}, length(u))
+  else
+    du2 = zeros(rate_prototype)
+  end
   # f₀ = similar(u) fsalfirst
   f₁ = zeros(rate_prototype)
   vectmp = vec(similar(u,indices(u)))
@@ -892,7 +1015,9 @@ function alg_cache(alg::Rosenbrock23,u,rate_prototype,uEltypeNoUnits,tTypeNoUnit
   uf = UJacobianWrapper(vfr,t)
   linsolve_tmp = vec(similar(u,indices(u)))
   jac_config = ForwardDiff.JacobianConfig{determine_chunksize(u,alg)}(vec(du1),vec(uprev))
-  Rosenbrock23Cache(u,uprev,k₁,k₂,k₃,du1,du2,f₁,vectmp,vectmp2,vectmp3,fsalfirst,fsallast,dT,J,W,tmp,tab,tf,uf,linsolve_tmp,alg.factorization,jac_config)
+  Rosenbrock23Cache(u,uprev,k₁,k₂,k₃,du1,du2,f₁,vectmp,vectmp2,vectmp3,fsalfirst,
+                    fsallast,dT,J,W,tmp,tab,tf,uf,linsolve_tmp,alg.linsolve,
+                    jac_config)
 end
 
 function alg_cache(alg::Rosenbrock32,u,rate_prototype,uEltypeNoUnits,tTypeNoUnits,uprev,uprev2,f,t,::Type{Val{true}})
@@ -900,7 +1025,11 @@ function alg_cache(alg::Rosenbrock32,u,rate_prototype,uEltypeNoUnits,tTypeNoUnit
   k₂ = zeros(rate_prototype)
   k₃ = zeros(rate_prototype)
   du1 = zeros(rate_prototype)
-  du2 = zeros(rate_prototype)
+  if alg_autodiff(alg)
+    du2 = zeros(Dual{determine_chunksize(u,alg), eltype(u)}, length(u))
+  else
+    du2 = zeros(rate_prototype)
+  end
   # f₀ = similar(u) fsalfirst
   f₁ = zeros(rate_prototype)
   vectmp = vec(similar(u,indices(u)))
@@ -918,7 +1047,7 @@ function alg_cache(alg::Rosenbrock32,u,rate_prototype,uEltypeNoUnits,tTypeNoUnit
   uf = UJacobianWrapper(vfr,t)
   linsolve_tmp = vec(similar(u,indices(u)))
   jac_config = ForwardDiff.JacobianConfig{determine_chunksize(u,alg)}(vec(du1),vec(uprev))
-  Rosenbrock32Cache(u,uprev,k₁,k₂,k₃,du1,du2,f₁,vectmp,vectmp2,vectmp3,fsalfirst,fsallast,dT,J,W,tmp,tab,tf,uf,linsolve_tmp,alg.factorization,jac_config)
+  Rosenbrock32Cache(u,uprev,k₁,k₂,k₃,du1,du2,f₁,vectmp,vectmp2,vectmp3,fsalfirst,fsallast,dT,J,W,tmp,tab,tf,uf,linsolve_tmp,alg.linsolve,jac_config)
 end
 
 immutable Rosenbrock23ConstantCache{T,TF,UF} <: OrdinaryDiffEqConstantCache
@@ -959,7 +1088,7 @@ function alg_cache(alg::Rosenbrock32,u,rate_prototype,uEltypeNoUnits,tTypeNoUnit
   Rosenbrock32ConstantCache(uEltypeNoUnits,tf,uf)
 end
 
-type ImplicitEulerCache{uType,uArrayType,vecuType,DiffCacheType,rateType,rhsType,adfType,CS} <: OrdinaryDiffEqMutableCache
+type ImplicitEulerCache{uType,uArrayType,vecuType,DiffCacheType,rateType,rhsType,nl_rhsType} <: OrdinaryDiffEqMutableCache
   u::uType
   uprev::uType
   uprev2::uType
@@ -970,7 +1099,7 @@ type ImplicitEulerCache{uType,uArrayType,vecuType,DiffCacheType,rateType,rhsType
   k::rateType
   fsalfirst::rateType
   rhs::rhsType
-  adf::adfType
+  nl_rhs::nl_rhsType
 end
 
 u_cache(c::ImplicitEulerCache)    = (c.uprev2,c.u_old)
@@ -980,41 +1109,33 @@ dual_cache(c::ImplicitEulerCache) = (c.dual_cache,)
 
 function alg_cache(alg::ImplicitEuler,u,rate_prototype,uEltypeNoUnits,tTypeNoUnits,uprev,uprev2,f,t,::Type{Val{true}})
   u_old = similar(u,indices(u)); k = zeros(rate_prototype)
-  dual_cache = DiffCache(u,Val{determine_chunksize(u,alg)})
+  dual_cache = DiffCache(u,Val{determine_chunksize(u,get_chunksize(alg.nlsolve))})
   uhold = vec(u) # this makes uhold the same values as integrator.u
   rhs = RHS_IE(f,u_old,t,t,dual_cache,size(u),eachindex(u))
   fsalfirst = zeros(rate_prototype)
-  if alg_autodiff(alg)
-    adf = autodiff_setup(rhs,uhold,alg)
-  else
-    adf = nothing
-  end
+  nl_rhs = alg.nlsolve(Val{:init},rhs,uhold)
   tmp = u_old
   ImplicitEulerCache{typeof(u),typeof(u_old),typeof(uhold),typeof(dual_cache),typeof(k),
-                     typeof(rhs),typeof(adf),determine_chunksize(u,alg)}(
-                     u,uprev,uprev2,uhold,dual_cache,u_old,tmp,k,fsalfirst,rhs,adf)
+                     typeof(rhs),typeof(nl_rhs)}(
+                     u,uprev,uprev2,uhold,dual_cache,u_old,tmp,k,fsalfirst,rhs,nl_rhs)
 end
 
-immutable ImplicitEulerConstantCache{vecuType,rhsType,adfType,CS} <: OrdinaryDiffEqConstantCache
+immutable ImplicitEulerConstantCache{vecuType,rhsType,nl_rhsType} <: OrdinaryDiffEqConstantCache
   uhold::vecuType
   u_old::vecuType
   rhs::rhsType
-  adf::adfType
+  nl_rhs::nl_rhsType
 end
 
 function alg_cache(alg::ImplicitEuler,u,rate_prototype,uEltypeNoUnits,tTypeNoUnits,uprev,uprev2,f,t,::Type{Val{false}})
   uhold = Vector{typeof(u)}(1)
   u_old = Vector{typeof(u)}(1)
   rhs = RHS_IE_Scalar(f,u_old,t,t)
-  if alg_autodiff(alg)
-    adf = autodiff_setup(rhs,uhold,alg)
-  else
-    adf = nothing
-  end
-  ImplicitEulerConstantCache{typeof(uhold),typeof(rhs),typeof(adf),1}(uhold,u_old,rhs,adf)
+  nl_rhs = alg.nlsolve(Val{:init},rhs,uhold)
+  ImplicitEulerConstantCache{typeof(uhold),typeof(rhs),typeof(nl_rhs)}(uhold,u_old,rhs,nl_rhs)
 end
 
-type TrapezoidCache{uType,uArrayType,vecuType,DiffCacheType,rateType,rhsType,adfType,CS} <: OrdinaryDiffEqMutableCache
+type TrapezoidCache{uType,uArrayType,vecuType,DiffCacheType,rateType,rhsType,nl_rhsType} <: OrdinaryDiffEqMutableCache
   u::uType
   uprev::uType
   uprev2::uType
@@ -1025,7 +1146,7 @@ type TrapezoidCache{uType,uArrayType,vecuType,DiffCacheType,rateType,rhsType,adf
   tmp::uType
   k::rateType
   rhs::rhsType
-  adf::adfType
+  nl_rhs::nl_rhsType
 end
 
 u_cache(c::TrapezoidCache)    = (c.uprev2,c.u_old)
@@ -1036,40 +1157,154 @@ dual_cache(c::TrapezoidCache) = (c.dual_cache,)
 function alg_cache(alg::Trapezoid,u,rate_prototype,uEltypeNoUnits,tTypeNoUnits,uprev,uprev2,f,t,::Type{Val{true}})
   u_old = similar(u,indices(u)); k = zeros(rate_prototype)
   uhold = vec(u); fsalfirst = zeros(rate_prototype)
-  dual_cache = DiffCache(u,Val{determine_chunksize(u,alg)})
+  dual_cache = DiffCache(u,Val{determine_chunksize(u,get_chunksize(alg.nlsolve))})
   rhs = RHS_Trap(f,u_old,fsalfirst,t,t,size(u),dual_cache,eachindex(u))
-  if alg_autodiff(alg)
-    adf = autodiff_setup(rhs,uhold,alg)
-  else
-    adf = nothing
-  end
+  nl_rhs = alg.nlsolve(Val{:init},rhs,uhold)
   tmp = u_old
   TrapezoidCache{typeof(u),typeof(u_old),typeof(uhold),typeof(dual_cache),typeof(k),
-    typeof(rhs),typeof(adf),determine_chunksize(u,alg)}(
-    u,uprev,uprev2,uhold,u_old,fsalfirst,dual_cache,tmp,k,rhs,adf)
+    typeof(rhs),typeof(nl_rhs)}(u,uprev,uprev2,uhold,u_old,fsalfirst,dual_cache,tmp,k,rhs,nl_rhs)
 end
 
 
-immutable TrapezoidConstantCache{vecuType,rhsType,adfType,CS} <: OrdinaryDiffEqConstantCache
+immutable TrapezoidConstantCache{vecuType,rhsType,nl_rhsType} <: OrdinaryDiffEqConstantCache
   uhold::vecuType
   u_old::vecuType
   rhs::rhsType
-  adf::adfType
+  nl_rhs::nl_rhsType
 end
 
 function alg_cache(alg::Trapezoid,u,rate_prototype,uEltypeNoUnits,tTypeNoUnits,uprev,uprev2,f,t,::Type{Val{false}})
   uhold = Vector{typeof(u)}(1)
   u_old = Vector{typeof(u)}(1)
   rhs = RHS_Trap_Scalar(f,u_old,rate_prototype,t,t)
-  if alg_autodiff(alg)
-    adf = autodiff_setup(rhs,uhold,alg)
-  else
-    adf = nothing
-  end
-  TrapezoidConstantCache{typeof(uhold),typeof(rhs),typeof(adf),1}(uhold,u_old,rhs,adf)
+  nl_rhs = alg.nlsolve(Val{:init},rhs,uhold)
+  TrapezoidConstantCache{typeof(uhold),typeof(rhs),typeof(nl_rhs)}(uhold,u_old,rhs,nl_rhs)
 end
 
+immutable IIF1ConstantCache{vecuType,rhsType,nl_rhsType} <: OrdinaryDiffEqConstantCache
+  uhold::vecuType
+  rhs::rhsType
+  nl_rhs::nl_rhsType
+end
 
+immutable IIF1Cache{uType,vecuType,DiffCacheType,rhsType,nl_rhsType,rateType} <: OrdinaryDiffEqMutableCache
+  u::uType
+  uprev::uType
+  uhold::vecuType
+  dual_cache::DiffCacheType
+  tmp::uType
+  rhs::rhsType
+  nl_rhs::nl_rhsType
+  rtmp1::rateType
+  fsalfirst::rateType
+  k::rateType
+end
+
+u_cache(c::IIF1Cache)    = (c.uprev2,c.u_old)
+du_cache(c::IIF1Cache)   = (c.rtmp1,c.tmp,c.fsalfirst,c.k)
+vecu_cache(c::IIF1Cache) = (c.uhold,)
+dual_cache(c::IIF1Cache) = (c.dual_cache,)
+
+function alg_cache(alg::IIF1,u,rate_prototype,uEltypeNoUnits,tTypeNoUnits,uprev,uprev2,f,t,::Type{Val{false}})
+  uhold = Vector{typeof(u)}(1)
+  tmp = zero(rate_prototype)
+  rhs = RHS_IIF1_Scalar(f,tmp,t,t)
+  nl_rhs = alg.nlsolve(Val{:init},rhs,uhold)
+  IIF1ConstantCache(uhold,rhs,nl_rhs)
+end
+
+function alg_cache(alg::IIF1,u,rate_prototype,uEltypeNoUnits,tTypeNoUnits,uprev,uprev2,f,t,::Type{Val{true}})
+
+  tmp = similar(u,indices(u)); rtmp1 = zeros(rate_prototype)
+  dual_cache = DiffCache(u,Val{determine_chunksize(u,get_chunksize(alg.nlsolve))})
+  uhold = vec(u) # this makes uhold the same values as integrator.u
+  rhs = RHS_IIF1(f,tmp,t,t,dual_cache,size(u),eachindex(u))
+  k = similar(rate_prototype); fsalfirst = similar(rate_prototype)
+  nl_rhs = alg.nlsolve(Val{:init},rhs,uhold)
+  IIF1Cache(u,uprev,uhold,dual_cache,tmp,rhs,nl_rhs,rtmp1,fsalfirst,k)
+end
+
+immutable IIF2ConstantCache{vecuType,rhsType,nl_rhsType} <: OrdinaryDiffEqConstantCache
+  uhold::vecuType
+  rhs::rhsType
+  nl_rhs::nl_rhsType
+end
+
+immutable IIF2Cache{uType,vecuType,DiffCacheType,rhsType,nl_rhsType,rateType} <: OrdinaryDiffEqMutableCache
+  u::uType
+  uprev::uType
+  uhold::vecuType
+  dual_cache::DiffCacheType
+  tmp::uType
+  rhs::rhsType
+  nl_rhs::nl_rhsType
+  rtmp1::rateType
+  fsalfirst::rateType
+  k::rateType
+end
+
+u_cache(c::IIF2Cache)    = (c.uprev2,c.u_old)
+du_cache(c::IIF2Cache)   = (c.rtmp1,c.tmp,c.fsalfirst,c.k)
+vecu_cache(c::IIF2Cache) = (c.uhold,)
+dual_cache(c::IIF2Cache) = (c.dual_cache,)
+
+function alg_cache(alg::IIF2,u,rate_prototype,uEltypeNoUnits,tTypeNoUnits,uprev,uprev2,f,t,::Type{Val{false}})
+  uhold = Vector{typeof(u)}(1)
+  tmp = zero(rate_prototype)
+  rhs = RHS_IIF2_Scalar(f,tmp,t,t)
+  nl_rhs = alg.nlsolve(Val{:init},rhs,uhold)
+  IIF2ConstantCache(uhold,rhs,nl_rhs)
+end
+
+function alg_cache(alg::IIF2,u,rate_prototype,uEltypeNoUnits,tTypeNoUnits,uprev,uprev2,f,t,::Type{Val{true}})
+  tmp = similar(u,indices(u)); rtmp1 = zeros(rate_prototype)
+  dual_cache = DiffCache(u,Val{determine_chunksize(u,get_chunksize(alg.nlsolve))})
+  uhold = vec(u) # this makes uhold the same values as integrator.u
+  k = similar(rate_prototype); fsalfirst = similar(rate_prototype)
+  rhs = RHS_IIF2(f,tmp,t,t,dual_cache,size(u),eachindex(u))
+  nl_rhs = alg.nlsolve(Val{:init},rhs,uhold)
+  IIF2Cache(u,uprev,uhold,dual_cache,tmp,rhs,nl_rhs,rtmp1,fsalfirst,k)
+end
+
+immutable LawsonEulerCache{uType,rateType} <: OrdinaryDiffEqMutableCache
+  u::uType
+  uprev::uType
+  tmp::uType
+  k::rateType
+  rtmp::rateType
+  fsalfirst::rateType
+end
+
+function alg_cache(alg::LawsonEuler,u,rate_prototype,uEltypeNoUnits,tTypeNoUnits,uprev,uprev2,f,t,::Type{Val{true}})
+  LawsonEulerCache(u,uprev,similar(u),zeros(rate_prototype),zeros(rate_prototype),zeros(rate_prototype))
+end
+
+u_cache(c::LawsonEulerCache) = ()
+du_cache(c::LawsonEulerCache) = (c.k,c.fsalfirst,c.rtmp)
+
+immutable LawsonEulerConstantCache <: OrdinaryDiffEqConstantCache end
+
+alg_cache(alg::LawsonEuler,u,rate_prototype,uEltypeNoUnits,tTypeNoUnits,uprev,uprev2,f,t,::Type{Val{false}}) = LawsonEulerConstantCache()
+
+immutable NorsettEulerCache{uType,rateType} <: OrdinaryDiffEqMutableCache
+  u::uType
+  uprev::uType
+  tmp::uType
+  k::rateType
+  rtmp::rateType
+  fsalfirst::rateType
+end
+
+function alg_cache(alg::NorsettEuler,u,rate_prototype,uEltypeNoUnits,tTypeNoUnits,uprev,uprev2,f,t,::Type{Val{true}})
+  NorsettEulerCache(u,uprev,similar(u),zeros(rate_prototype),zeros(rate_prototype),zeros(rate_prototype))
+end
+
+u_cache(c::NorsettEulerCache) = ()
+du_cache(c::NorsettEulerCache) = (c.k,c.fsalfirst)
+
+immutable NorsettEulerConstantCache <: OrdinaryDiffEqConstantCache end
+
+alg_cache(alg::NorsettEuler,u,rate_prototype,uEltypeNoUnits,tTypeNoUnits,uprev,uprev2,f,t,::Type{Val{false}}) = NorsettEulerConstantCache()
 
 get_chunksize(cache::DECache) = error("This cache does not have a chunksize.")
 get_chunksize{uType,DiffCacheType,rateType,CS}(cache::ImplicitEulerCache{uType,DiffCacheType,rateType,CS}) = CS

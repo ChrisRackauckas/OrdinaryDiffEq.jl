@@ -32,9 +32,9 @@ sol = solve(prob,Tsit5(),callback=callback)
 # Chunk size must be fixed since otherwise it's dependent on size
 # when the size is less than 10, so errors here
 
-sol = solve(prob,ImplicitEuler(chunk_size=1),callback=callback,dt=1/10)
+sol = solve(prob,ImplicitEuler(nlsolve=NLSOLVEJL_SETUP(chunk_size=1)),callback=callback,dt=1/10)
 
-sol = solve(prob,Trapezoid(chunk_size=1),callback=callback,dt=1/10)
+sol = solve(prob,Trapezoid(nlsolve=NLSOLVEJL_SETUP(chunk_size=1)),callback=callback,dt=1/10)
 
 sol = solve(prob,Rosenbrock23(chunk_size=1),callback=callback,dt=1/10)
 
@@ -51,9 +51,9 @@ plot(p1,p2,layout=(2,1),size=(600,1000))
 savefig("cell.pdf")
 =#
 
-for alg in NON_IMPLICIT_ALGS
+for alg in CACHE_TEST_ALGS
   println(alg)
-  sol = solve(prob,alg(),callback=callback,dt=1/10)
+  sol = solve(prob,alg,callback=callback,dt=1/10)
 end
 
 #=

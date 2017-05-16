@@ -4,6 +4,7 @@ immutable InterpolationData{F,uType,tType,kType,cacheType} <: Function
   ts::tType
   ks::kType
   notsaveat_idxs::Vector{Int}
+  dense::Bool
   cache::cacheType
 end
 
@@ -14,6 +15,7 @@ immutable CompositeInterpolationData{F,uType,tType,kType,cacheType} <: Function
   ks::kType
   alg_choice::Vector{Int}
   notsaveat_idxs::Vector{Int}
+  dense::Bool
   cache::cacheType
 end
 
@@ -27,6 +29,7 @@ function InterpolationData(id::InterpolationData,f)
                       id.ts,
                       id.ks,
                       id.notsaveat_idxs,
+                      id.dense,
                       id.cache)
 end
 
@@ -36,5 +39,6 @@ function CompositeInterpolationData(id::CompositeInterpolationData,f)
                                id.ks,
                                id.alg_choice,
                                id.notsaveat_idxs,
+                               id.dense,
                                id.cache)
 end

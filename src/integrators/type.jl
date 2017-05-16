@@ -1,7 +1,7 @@
-type DEOptions{uEltype,uEltypeNoUnits,tTypeNoUnits,tType,F2,F3,F4,F5,F6,tstopsType,ECType}
+type DEOptions{uEltype,uEltypeNoUnits,tTypeNoUnits,tType,F2,F3,F4,F5,F6,tstopsType,ECType,SType}
   maxiters::Int
   timeseries_steps::Int
-  save_timeseries::Bool
+  save_everystep::Bool
   adaptive::Bool
   abstol::uEltype
   reltol::uEltypeNoUnits
@@ -11,6 +11,7 @@ type DEOptions{uEltype,uEltypeNoUnits,tTypeNoUnits,tType,F2,F3,F4,F5,F6,tstopsTy
   dtmax::tType
   dtmin::tType
   internalnorm::F2
+  save_idxs::SType
   tstops::tstopsType
   saveat::tstopsType
   d_discontinuities::tstopsType
@@ -25,6 +26,7 @@ type DEOptions{uEltype,uEltypeNoUnits,tTypeNoUnits,tType,F2,F3,F4,F5,F6,tstopsTy
   beta2::tTypeNoUnits
   qoldinit::tTypeNoUnits
   dense::Bool
+  save_start::Bool
   callback::F3
   isoutofdomain::F4
   unstable_check::F6
@@ -35,7 +37,7 @@ type DEOptions{uEltype,uEltypeNoUnits,tTypeNoUnits,tType,F2,F3,F4,F5,F6,tstopsTy
   stop_at_next_tstop::Bool
 end
 
-type ODEIntegrator{algType<:OrdinaryDiffEqAlgorithm,uType<:Union{AbstractArray,Number},tType,tTypeNoUnits,tdirType,ksEltype,SolType,rateType,F,ProgressType,CacheType,O} <: AbstractODEIntegrator
+type ODEIntegrator{algType<:OrdinaryDiffEqAlgorithm,uType,tType,tTypeNoUnits,tdirType,ksEltype,SolType,rateType,F,ProgressType,CacheType,O,FSALType} <: AbstractODEIntegrator
   sol::SolType
   u::uType
   k::ksEltype
@@ -51,7 +53,6 @@ type ODEIntegrator{algType<:OrdinaryDiffEqAlgorithm,uType<:Union{AbstractArray,N
   dtcache::tType
   dtchangeable::Bool
   dtpropose::tType
-  dt_mod::tTypeNoUnits
   tdir::tdirType
   EEst::tTypeNoUnits
   qold::tTypeNoUnits
@@ -68,19 +69,24 @@ type ODEIntegrator{algType<:OrdinaryDiffEqAlgorithm,uType<:Union{AbstractArray,N
   reeval_fsal::Bool
   u_modified::Bool
   opts::O
-  fsalfirst::rateType
-  fsallast::rateType
+  fsalfirst::FSALType
+  fsallast::FSALType
 
-  ODEIntegrator(sol,u,k,t,dt,f,uprev,uprev2,tprev,
-      alg,rate_prototype,notsaveat_idxs,dtcache,dtchangeable,dtpropose,dt_mod,tdir,
+  function (::Type{ODEIntegrator{algType,uType,tType,tTypeNoUnits,tdirType,ksEltype,SolType,
+                rateType,F,ProgressType,CacheType,O,FSALType}}){algType,uType,tType,tTypeNoUnits,tdirType,ksEltype,SolType,
+                rateType,F,ProgressType,CacheType,O,FSALType}(sol,u,k,t,dt,f,uprev,uprev2,tprev,
+      alg,rate_prototype,notsaveat_idxs,dtcache,dtchangeable,dtpropose,tdir,
       EEst,qold,q11,
       iter,saveiter,saveiter_dense,prog,cache,
-      kshortsize,just_hit_tstop,accept_step,isout,reeval_fsal,u_modified,opts) = new(
-      sol,u,k,t,dt,f,uprev,uprev2,tprev,
-      alg,rate_prototype,notsaveat_idxs,dtcache,dtchangeable,dtpropose,dt_mod,tdir,
+      kshortsize,just_hit_tstop,accept_step,isout,reeval_fsal,u_modified,opts)
+
+      new{algType,uType,tType,tTypeNoUnits,tdirType,ksEltype,SolType,
+                  rateType,F,ProgressType,CacheType,O,FSALType}(sol,u,k,t,dt,f,uprev,uprev2,tprev,
+      alg,rate_prototype,notsaveat_idxs,dtcache,dtchangeable,dtpropose,tdir,
       EEst,qold,q11,
       iter,saveiter,saveiter_dense,prog,cache,
       kshortsize,just_hit_tstop,accept_step,isout,reeval_fsal,u_modified,opts) # Leave off fsalfirst and last
+  end
 end
 
 # When this is changed, DelayDiffEq.jl must be changed as well!

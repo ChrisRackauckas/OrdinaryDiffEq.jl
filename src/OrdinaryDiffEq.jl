@@ -4,7 +4,13 @@ module OrdinaryDiffEq
 
   using DiffEqBase
 
-  import DiffEqBase: solve, solve!, init, step!, build_solution
+  using Compat
+
+  # Interfaces
+  import DiffEqBase: solve, solve!, init, step!, build_solution, initialize!
+
+  # Internal utils
+  import DiffEqBase: realtype, ODE_DEFAULT_NORM, ODE_DEFAULT_ISOUTOFDOMAIN, ODE_DEFAULT_PROG_MESSAGE, ODE_DEFAULT_UNSTABLE_CHECK
 
   using Parameters, GenericSVD, ForwardDiff, InplaceOps, RecursiveArrayTools,
         NLsolve, Juno, Calculus, Roots, DataStructures, Iterators
@@ -15,15 +21,12 @@ module OrdinaryDiffEq
 
   import ForwardDiff.Dual
 
+  # Integrator Interface
   import DiffEqBase: resize!,deleteat!,addat!,full_cache,user_cache,u_cache,du_cache,
                      resize_non_user_cache!,deleteat_non_user_cache!,addat_non_user_cache!,
-                     terminate!,get_du, get_dt,get_proposed_dt,modify_proposed_dt!,
+                     terminate!,get_du, get_dt,get_proposed_dt,set_proposed_dt!,
                      u_modified!,savevalues!,add_tstop!,add_saveat!,set_reltol!,
                      set_abstol!
-
-  #Constants
-
-  const TEST_FLOPS_CUTOFF = 1e10
 
   include("misc_utils.jl")
   include("algorithms.jl")
@@ -33,11 +36,16 @@ module OrdinaryDiffEq
   include("integrators/type.jl")
   include("integrators/integrator_utils.jl")
   include("integrators/fixed_timestep_integrators.jl")
+  include("integrators/symplectic_integrators.jl")
+  include("integrators/split_integrators.jl")
+  include("integrators/iif_integrators.jl")
+  include("integrators/exponential_rk_integrators.jl")
   include("integrators/explicit_rk_integrator.jl")
   include("integrators/low_order_rk_integrators.jl")
   include("integrators/high_order_rk_integrators.jl")
   include("integrators/verner_rk_integrators.jl")
   include("integrators/feagin_rk_integrators.jl")
+  include("integrators/ssprk_integrators.jl")
   include("integrators/implicit_integrators.jl")
   include("integrators/rosenbrock_integrators.jl")
   include("integrators/threaded_rk_integrators.jl")
@@ -71,8 +79,18 @@ module OrdinaryDiffEq
   # Reexport the Alg Types
 
   export OrdinaryDiffEqAlgorithm, OrdinaryDiffEqAdaptiveAlgorithm, OrdinaryDiffEqCompositeAlgorithm,
-        Discrete, FunctionMap, Euler, Midpoint, RK4, ExplicitRK, BS3, BS5, DP5, DP5Threaded, Tsit5,
-        DP8, Vern6, Vern7, Vern8, TanYam7, TsitPap8, Vern9, ImplicitEuler,
+        Discrete, FunctionMap, Euler, Midpoint, SSPRK22, SSPRK33, SSPRK104, RK4, ExplicitRK, BS3, BS5,
+        DP5, DP5Threaded, Tsit5, DP8, Vern6, Vern7, Vern8, TanYam7, TsitPap8, Vern9, ImplicitEuler,
         Trapezoid, Rosenbrock23, Rosenbrock32, Feagin10, Feagin12, Feagin14,
         CompositeAlgorithm
+
+  export IIF1, IIF2
+
+  export LawsonEuler, NorsettEuler
+
+  export SymplecticEuler
+
+  #export Verlet, VelocityVerlet
+
+  export SplitEuler
 end # module

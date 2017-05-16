@@ -1,4 +1,5 @@
 using OrdinaryDiffEq, DiffEqProblemLibrary,Base.Test, DiffEqBase
+using Calculus, ForwardDiff
 
 bools = Vector{Bool}(0)
 prob = prob_ode_linear
@@ -12,6 +13,7 @@ sol2 =solve(prob,Euler(),dt=1//2^(4),dense=true)
 sol3 =solve(prob,Euler(),dt=1//2^(5),dense=true)
 
 prob = prob_ode_2Dlinear
+
 sol =solve(prob,Euler(),dt=1//2^(2),dense=true)
 
 interpd = sol(0:1//2^(4):1)
@@ -40,7 +42,7 @@ sol(interpd,0:1//2^(4):1)
 
 sol =solve(prob,Euler(),dt=1//2^(2),dense=false)
 
-@test_throws BoundsError sol(0.5)
+@test !(sol(0.6)[4,2] ≈ 0)
 
 prob = prob_ode_linear
 
@@ -62,6 +64,46 @@ sol2 =solve(prob,Midpoint(),dt=1//2^(4),dense=true)
 
 @test maximum(map((x)->maximum(abs.(x)),sol2[:] - interpd)) < 2.3e-2
 
+# SSPRK22
+prob = prob_ode_linear
+sol =solve(prob,SSPRK22(),dt=1//2^(2),dense=true)
+sol(interpd_1d,0:1//2^(4):1)
+sol2 =solve(prob,SSPRK22(),dt=1//2^(4),dense=true)
+@test maximum(map((x)->maximum(abs.(x)),sol2[:] - interpd_1d)) < 1.5e-2
+
+prob = prob_ode_2Dlinear
+sol =solve(prob,SSPRK22(),dt=1//2^(2),dense=true)
+sol(interpd,0:1//2^(4):1)
+sol2 =solve(prob,SSPRK22(),dt=1//2^(4),dense=true)
+@test maximum(map((x)->maximum(abs.(x)),sol2[:] - interpd)) < 2.5e-2
+
+# SSPRK33
+prob = prob_ode_linear
+sol =solve(prob,SSPRK33(),dt=1//2^(2),dense=true)
+sol(interpd_1d,0:1//2^(4):1)
+sol2 =solve(prob,SSPRK33(),dt=1//2^(4),dense=true)
+@test maximum(map((x)->maximum(abs.(x)),sol2[:] - interpd_1d)) < 7.5e-4
+
+prob = prob_ode_2Dlinear
+sol =solve(prob,SSPRK33(),dt=1//2^(2),dense=true)
+sol(interpd,0:1//2^(4):1)
+sol2 =solve(prob,SSPRK33(),dt=1//2^(4),dense=true)
+@test maximum(map((x)->maximum(abs.(x)),sol2[:] - interpd)) < 1.5e-3
+
+# SSPRK104
+prob = prob_ode_linear
+sol =solve(prob,SSPRK104(),dt=1//2^(2),dense=true)
+sol(interpd_1d,0:1//2^(4):1)
+sol2 =solve(prob,SSPRK104(),dt=1//2^(4),dense=true)
+@test maximum(map((x)->maximum(abs.(x)),sol2[:] - interpd_1d)) < 1.5e-5
+
+prob = prob_ode_2Dlinear
+sol =solve(prob,SSPRK104(),dt=1//2^(2),dense=true)
+sol(interpd,0:1//2^(4):1)
+sol2 =solve(prob,SSPRK104(),dt=1//2^(4),dense=true)
+@test maximum(map((x)->maximum(abs.(x)),sol2[:] - interpd)) < 3.e-5
+
+# RK4
 prob = prob_ode_linear
 
 sol =solve(prob,RK4(),dt=1//2^(2),dense=true)
@@ -333,9 +375,23 @@ sol2 =solve(prob,Vern9(),dt=1//2^(4),dense=true,adaptive=false)
 
 prob = prob_ode_linear
 
-sol =solve(prob,Rosenbrock23(),dt=1//2^(2),dense=true)
+sol =solve(prob,Rosenbrock23(),dt=1//2^(12),dense=true)
 
-sol(interpd_1d,0:1//2^(4):1)
+sol(0:1//2^(4):1)
+
+sol(0:1//2^(4):1,Val{1})
+
+const deriv_test_points = linspace(0,1,10)
+
+for t in deriv_test_points
+  deriv = sol(t,Val{1})
+  if t == 0
+    #@test deriv ≈ derivative(sol,0.00,:forward)
+  elseif t != 1
+    #@test deriv ≈ derivative(sol,t)
+  end
+  @test deriv ≈ ForwardDiff.derivative(sol,t)
+end
 
 sol2 =solve(prob,Rosenbrock23(),dt=1//2^(4),dense=true,adaptive=false)
 

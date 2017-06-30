@@ -94,35 +94,33 @@ end
   uprev,duprev = integrator.uprev.x
   u,du = integrator.u.x
   ku, kdu = integrator.k[2].x[1], integrator.k[2].x[2]
-  # update position
-  @tight_loop_macros for i in eachindex(u)
-    @inbounds u[i] = @muladd uprev[i]+duprev[i]*dt
-  end
-  # update velocity
-  f[2](integrator.t,u,duprev,kdu)
+  # update velocity & position
+  f[2](integrator.t,uprev,duprev,kdu)
   @tight_loop_macros for i in eachindex(du)
-    @inbounds du[i] = @muladd duprev[i] + dt*(-1//24)*kdu[i]
+    @inbounds du[i] = @muladd duprev[i] + (7//24)*dt*kdu[i]
+  end
+  f[1](integrator.t,uprev,du,ku)
+  @tight_loop_macros for i in eachindex(u)
+    @inbounds u[i] = @muladd uprev[i] + (2//3)*dt*ku[i]
   end
 
-  # update position & velocity
+  # update velocity & position
+  f[2](integrator.t+2//3,u,du,kdu)
+  @tight_loop_macros for i in eachindex(du)
+    @inbounds du[i] += (3//4)*dt*kdu[i]
+  end
   f[1](integrator.t,u,du,ku)
   @tight_loop_macros for i in eachindex(u)
-    @inbounds u[i] += dt*(-2//3)*ku[i]
+    @inbounds u[i] -= 2//3*dt*ku[i]
   end
 
-  f[2](integrator.t,u,ku,kdu)
+  # update velocity & position
+  f[2](integrator.t,u,du,kdu)
   @tight_loop_macros for i in eachindex(du)
-    @inbounds du[i] += dt*(3//4)*kdu[i]
+    @inbounds du[i] -= (1//24)*dt*kdu[i]
   end
-
-  # update position & velocity
   f[1](integrator.t,u,du,ku)
   @tight_loop_macros for i in eachindex(u)
-    @inbounds u[i] += dt*(2//3)*ku[i]
-  end
-
-  f[2](integrator.t,u,ku,kdu)
-  @tight_loop_macros for i in eachindex(du)
-    @inbounds du[i] += dt*(7//24)*kdu[i]
+    @inbounds u[i] += dt*ku[i]
   end
 end

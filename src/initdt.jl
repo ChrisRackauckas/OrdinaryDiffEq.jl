@@ -1,10 +1,26 @@
 function ode_determine_initdt{tType,uType}(u0,t::tType,tdir,dtmax,abstol,reltol,internalnorm,prob::AbstractODEProblem{uType,tType,true},order)
   f = prob.f
-  f₀ = similar(u0./t); f₁ = similar(u0./t); u₁ = similar(u0)
-  sk = abstol+abs.(u0).*reltol
-  d₀ = internalnorm(u0./sk)
+  f₀ = zeros(u0./t); f₁ = zeros(u0./t); u₁ = zeros(u0); sk = zeros(u0);
+  # Hack to  make a generic u0 with no units, https://github.com/JuliaLang/julia/issues/22216
+  typeof(u0[1]) <: AbstractArray ? tmp = zeros(u0,typeof(ones(u0[1]))) : tmp = zeros(u0,typeof(one(u0[1])))
+  uidx = eachindex(u0)
+  #sk = abstol+abs.(u0).*reltol
+  #d₀ = internalnorm(u0./sk)
+
+  @tight_loop_macros for (i,atol,rtol) in zip(uidx,Iterators.cycle(abstol),Iterators.cycle(reltol))
+    @inbounds sk[i] = (atol+abs(u0[i])*rtol)
+    @inbounds tmp[i] = u0[i]./sk[i]
+  end
+  d₀ = internalnorm(tmp)
+
   f(t,u0,f₀)
-  d₁ = internalnorm((f₀./sk*tType(1))/tType(1))
+  #d₁ = internalnorm((f₀./sk*tType(1))/tType(1))
+
+  @tight_loop_macros for i in uidx
+    tmp[i] = (f₀[i]./sk[i]*tType(1))
+  end
+  d₁ = internalnorm(tmp)
+
   T0 = typeof(d₀)
   T1 = typeof(d₁)
   if d₀ < T0(1//10^(5)) || d₁ < T1(1//10^(5))
@@ -13,11 +29,19 @@ function ode_determine_initdt{tType,uType}(u0,t::tType,tdir,dtmax,abstol,reltol,
     dt₀ = tType((d₀/d₁)/100)
   end
   dt₀ = min(dt₀,tdir*dtmax)
-  @inbounds for i in eachindex(u0)
-     u₁[i] = u0[i] + tdir*dt₀*f₀[i]
+
+  #@. u₁ = @muladd u0 + tdir*dt₀*f₀
+  @tight_loop_macros for i in uidx
+    @inbounds u₁[i] = u0[i] + tdir*dt₀*f₀[i]
   end
+
   f(t+tdir*dt₀,u₁,f₁)
-  tmp = (f₁.-f₀)./(abstol+abs.(u0).*reltol)*tType(1)
+
+  #tmp = (f₁.-f₀)./(abstol+abs.(u0).*reltol)*tType(1)
+  @tight_loop_macros for (i,atol,rtol) in zip(uidx,Iterators.cycle(abstol),Iterators.cycle(reltol))
+    tmp[i] = (f₁[i]-f₀[i])./(atol+abs(u0[i])*rtol)*tType(1)
+  end
+
   d₂ = internalnorm(tmp)/dt₀
   # Hairer has d₂ = sqrt(sum(abs2,tmp))/dt₀, note the lack of norm correction
   unitless_max = max(d₁/typeof(d₁)(one(d₁)),d₂/typeof(d₂)(one(d₂)))

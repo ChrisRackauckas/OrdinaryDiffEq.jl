@@ -68,18 +68,14 @@ end
   end
 end
 
-@inline function savevalues!(integrator::ODEIntegrator)
+@inline function savevalues!(integrator::ODEIntegrator,force_save=false)
   while !isempty(integrator.opts.saveat) && integrator.tdir*top(integrator.opts.saveat) <= integrator.tdir*integrator.t # Perform saveat
     integrator.saveiter += 1
     curt = pop!(integrator.opts.saveat)
     if curt!=integrator.t # If <t, interpolate
       ode_addsteps!(integrator)
       Θ = (curt - integrator.tprev)/integrator.dt
-      if integrator.opts.save_idxs == nothing
-        val = ode_interpolant(Θ,integrator,indices(integrator.uprev),Val{0}) # out of place, but no force copy later
-      else
-        val = ode_interpolant(Θ,integrator,integrator.opts.save_idxs,Val{0}) # out of place, but no force copy later
-      end
+      val = ode_interpolant(Θ,integrator,integrator.opts.save_idxs,Val{0}) # out of place, but no force copy later
       copyat_or_push!(integrator.sol.t,integrator.saveiter,curt)
       save_val = val
       copyat_or_push!(integrator.sol.u,integrator.saveiter,save_val,Val{false})
@@ -109,7 +105,7 @@ end
       end
     end
   end
-  if integrator.opts.save_everystep && integrator.iter%integrator.opts.timeseries_steps==0
+  if force_save || (integrator.opts.save_everystep && integrator.iter%integrator.opts.timeseries_steps==0)
     integrator.saveiter += 1
     if integrator.opts.save_idxs == nothing
       copyat_or_push!(integrator.sol.u,integrator.saveiter,integrator.u)
@@ -168,16 +164,23 @@ end
 
 @inline function loopfooter!(integrator)
   if integrator.opts.adaptive
-    integrator.q11 = integrator.EEst^integrator.opts.beta1
-    q = integrator.q11/(integrator.qold^integrator.opts.beta2)
-    q = max(inv(integrator.opts.qmax),min(inv(integrator.opts.qmin),q/integrator.opts.gamma))
-    dtnew = integrator.dt/q
+    EEst,beta1,q11,qold,beta2 = integrator.EEst, integrator.opts.beta1, integrator.q11,integrator.qold,integrator.opts.beta2
+    @fastmath q11 = EEst^beta1
+    @fastmath q = q11/(qold^beta2)
+    integrator.q11 = q11
+    @fastmath q = max(inv(integrator.opts.qmax),min(inv(integrator.opts.qmin),q/integrator.opts.gamma))
+    @fastmath dtnew = integrator.dt/q
     ttmp = integrator.t + integrator.dt
     integrator.isout = integrator.opts.isoutofdomain(ttmp,integrator.u)
     integrator.accept_step = (!integrator.isout && integrator.EEst <= 1.0) || (integrator.opts.force_dtmin && abs(integrator.dt) <= abs(integrator.opts.dtmin))
     if integrator.accept_step # Accept
       integrator.tprev = integrator.t
-      integrator.t = ttmp
+      if typeof(integrator.t)<:AbstractFloat && !isempty(integrator.opts.tstops)
+        tstop = top(integrator.opts.tstops)
+        abs(ttmp - tstop) < 10eps(integrator.t) ? (integrator.t = tstop) : (integrator.t = ttmp)
+      else
+        integrator.t = ttmp
+      end
       integrator.qold = max(integrator.EEst,integrator.opts.qoldinit)
       calc_dt_propose!(integrator,dtnew)
       handle_callbacks!(integrator)
@@ -202,18 +205,17 @@ end
 
   continuous_modified = false
   discrete_modified = false
+  saved_in_cb = false
   if !(typeof(continuous_callbacks)<:Tuple{})
     time,upcrossing,idx,counter = find_first_continuous_callback(integrator,continuous_callbacks...)
     if time != zero(typeof(integrator.t)) && upcrossing != 0 # if not, then no events
-      atleast_one_callback = true
-      continuous_modified = apply_callback!(integrator,continuous_callbacks[idx],time,upcrossing)
+      continuous_modified,saved_in_cb = apply_callback!(integrator,continuous_callbacks[idx],time,upcrossing)
     end
   end
   if !(typeof(discrete_callbacks)<:Tuple{})
-    atleast_one_callback = true
-    discrete_modified = apply_discrete_callback!(integrator,discrete_callbacks...)
+    discrete_modified,saved_in_cb = apply_discrete_callback!(integrator,discrete_callbacks...)
   end
-  if !atleast_one_callback
+  if !saved_in_cb
     savevalues!(integrator)
   end
 
@@ -318,8 +320,8 @@ end
   integrator.reeval_fsal = false
 end
 
-function (integrator::ODEIntegrator)(t,deriv::Type=Val{0};idxs=size(integrator.uprev))
+function (integrator::ODEIntegrator)(t,deriv::Type=Val{0};idxs=nothing)
   current_interpolant(t,integrator,idxs,deriv)
 end
 
-(integrator::ODEIntegrator)(val::AbstractArray,t::Union{Number,AbstractArray},deriv::Type=Val{0};idxs=eachindex(integrator.uprev)) = current_interpolant!(val,t,integrator,idxs,deriv)
+(integrator::ODEIntegrator)(val::AbstractArray,t::Union{Number,AbstractArray},deriv::Type=Val{0};idxs=nothing) = current_interpolant!(val,t,integrator,idxs,deriv)

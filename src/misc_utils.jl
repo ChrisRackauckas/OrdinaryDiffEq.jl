@@ -1,15 +1,15 @@
-immutable DiffCache{T, S}
-    du::Vector{T}
-    dual_du::Vector{S}
+immutable DiffCache{T<:AbstractArray, S<:AbstractArray}
+    du::T
+    dual_du::S
 end
 
-Base.@pure function DiffCache{chunk_size}(T, length, ::Type{Val{chunk_size}})
-    DiffCache(zeros(T, length), zeros(Dual{chunk_size, T}, length))
+Base.@pure function DiffCache{chunk_size}(T, size, ::Type{Val{chunk_size}})
+    DiffCache(zeros(T, size...), zeros(Dual{:DiffEqNLSolve,T,chunk_size}, size...))
 end
 
-Base.@pure DiffCache(u::AbstractArray) = DiffCache(eltype(u),length(u),Val{ForwardDiff.pickchunksize(length(u))})
-Base.@pure DiffCache(u::AbstractArray,nlsolve) = DiffCache(eltype(u),length(u),Val{get_chunksize(nlsolve)})
-Base.@pure DiffCache{CS}(u::AbstractArray,T::Type{Val{CS}}) = DiffCache(eltype(u),length(u),T)
+Base.@pure DiffCache(u::AbstractArray) = DiffCache(eltype(u),size(u),Val{ForwardDiff.pickchunksize(length(u))})
+Base.@pure DiffCache(u::AbstractArray,nlsolve) = DiffCache(eltype(u),size(u),Val{get_chunksize(nlsolve)})
+Base.@pure DiffCache{CS}(u::AbstractArray,T::Type{Val{CS}}) = DiffCache(eltype(u),size(u),T)
 
 get_du{T<:Dual}(dc::DiffCache, ::Type{T}) = dc.dual_du
 get_du(dc::DiffCache, T) = dc.du
@@ -30,7 +30,7 @@ function autodiff_setup{CS}(f!, initial_x::Vector,chunk_size::Type{Val{CS}})
     permf! = (fx, x) -> f!(x, fx)
 
     fx2 = copy(initial_x)
-    jac_cfg = ForwardDiff.JacobianConfig{CS}(initial_x, initial_x)
+    jac_cfg = ForwardDiff.JacobianConfig(:DiffEqNLSolve, initial_x, ForwardDiff.Chunk{CS}())
     g! = (x, gx) -> ForwardDiff.jacobian!(gx, permf!, fx2, x, jac_cfg)
 
     fg! = (x, fx, gx) -> begin

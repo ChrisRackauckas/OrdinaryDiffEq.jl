@@ -35,8 +35,10 @@ end
   # Check if the event occured
   if typeof(callback.idxs) <: Void
     previous_condition = callback.condition(integrator.tprev,integrator.uprev,integrator)
-  else
+  elseif typeof(callback.idxs) <: Number
     previous_condition = callback.condition(integrator.tprev,integrator.uprev[callback.idxs],integrator)
+  else
+    previous_condition = callback.condition(integrator.tprev,@view(integrator.uprev[callback.idxs]),integrator)
   end
   if isapprox(previous_condition,0,rtol=callback.reltol,atol=callback.abstol)
     prev_sign = 0.0
@@ -45,9 +47,11 @@ end
   end
   prev_sign_index = 1
   if typeof(callback.idxs) <: Void
-    next_sign = sign(callback.condition(integrator.tprev+integrator.dt,integrator.u,integrator))
+    next_sign = sign(callback.condition(integrator.t,integrator.u,integrator))
+  elseif typeof(callback.idxs) <: Number
+    next_sign = sign(callback.condition(integrator.t,integrator.u[callback.idxs],integrator))
   else
-    next_sign = sign(callback.condition(integrator.tprev+integrator.dt,integrator.u[callback.idxs],integrator))
+    next_sign = sign(callback.condition(integrator.t,@view(integrator.u[callback.idxs]),integrator))
   end
   if ((prev_sign<0 && !(typeof(callback.affect!)<:Void)) || (prev_sign>0 && !(typeof(callback.affect_neg!)<:Void))) && prev_sign*next_sign<0
     event_occurred = true
@@ -145,9 +149,11 @@ function apply_callback!(integrator,callback::ContinuousCallback,cb_time,prev_si
   if cb_time != zero(typeof(integrator.t))
     change_t_via_interpolation!(integrator,integrator.tprev+cb_time)
   end
+  saved_in_cb = false
 
   @inbounds if callback.save_positions[1]
-    savevalues!(integrator)
+    savevalues!(integrator,true)
+    saved_in_cb = true
   end
 
   integrator.u_modified = true
@@ -169,40 +175,44 @@ function apply_callback!(integrator,callback::ContinuousCallback,cb_time,prev_si
   if integrator.u_modified
     reeval_internals_due_to_modification!(integrator)
     @inbounds if callback.save_positions[2]
-      savevalues!(integrator)
+      savevalues!(integrator,true)
+      saved_in_cb = true
     end
-    return true
+    return true,saved_in_cb
   end
-  false
+  false,saved_in_cb
 end
 
 #Base Case: Just one
-@inline function apply_discrete_callback!(integrator::ODEIntegrator,callback::DiscreteCallback)
+@inline function apply_discrete_callback!(integrator,callback::DiscreteCallback)
+  saved_in_cb = false
   @inbounds if callback.save_positions[1]
-    savevalues!(integrator)
+    savevalues!(integrator,true)
+    saved_in_cb = true
   end
 
   integrator.u_modified = true
-  if callback.condition(integrator.tprev+integrator.dt,integrator.u,integrator)
+  if callback.condition(integrator.t,integrator.u,integrator)
     callback.affect!(integrator)
     @inbounds if callback.save_positions[2]
-      savevalues!(integrator)
+      savevalues!(integrator,true)
+      saved_in_cb = true
     end
   end
-  integrator.u_modified
+  integrator.u_modified,saved_in_cb
 end
 
 #Starting: Get bool from first and do next
-@inline function apply_discrete_callback!(integrator::ODEIntegrator,callback::DiscreteCallback,args...)
-  apply_discrete_callback!(integrator,apply_discrete_callback!(integrator,callback),args...)
+@inline function apply_discrete_callback!(integrator,callback::DiscreteCallback,args...)
+  apply_discrete_callback!(integrator,apply_discrete_callback!(integrator,callback)...,args...)
 end
 
-@inline function apply_discrete_callback!(integrator::ODEIntegrator,discrete_modified::Bool,callback::DiscreteCallback,args...)
-  bool = apply_discrete_callback!(integrator,apply_discrete_callback!(integrator,callback),args...)
-  discrete_modified || bool
+@inline function apply_discrete_callback!(integrator,discrete_modified::Bool,saved_in_cb::Bool,callback::DiscreteCallback,args...)
+  bool,saved_in_cb2 = apply_discrete_callback!(integrator,apply_discrete_callback!(integrator,callback)...,args...)
+  discrete_modified || bool, saved_in_cb || saved_in_cb2
 end
 
-@inline function apply_discrete_callback!(integrator::ODEIntegrator,discrete_modified::Bool,callback::DiscreteCallback)
-  bool = apply_discrete_callback!(integrator,callback)
-  discrete_modified || bool
+@inline function apply_discrete_callback!(integrator,discrete_modified::Bool,saved_in_cb::Bool,callback::DiscreteCallback)
+  bool,saved_in_cb2 = apply_discrete_callback!(integrator,callback)
+  discrete_modified || bool, saved_in_cb || saved_in_cb2
 end

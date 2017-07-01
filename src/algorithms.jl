@@ -1,6 +1,6 @@
-@compat abstract type OrdinaryDiffEqAlgorithm <: AbstractODEAlgorithm end
-@compat abstract type OrdinaryDiffEqAdaptiveAlgorithm <: OrdinaryDiffEqAlgorithm end
-@compat abstract type OrdinaryDiffEqCompositeAlgorithm <: OrdinaryDiffEqAlgorithm end
+abstract type OrdinaryDiffEqAlgorithm <: AbstractODEAlgorithm end
+abstract type OrdinaryDiffEqAdaptiveAlgorithm <: OrdinaryDiffEqAlgorithm end
+abstract type OrdinaryDiffEqCompositeAlgorithm <: OrdinaryDiffEqAlgorithm end
 
 immutable Discrete{apply_map,scale_by_time} <: OrdinaryDiffEqAlgorithm end
 
@@ -15,7 +15,8 @@ immutable SSPRK104 <: OrdinaryDiffEqAlgorithm end
 
 #immutable Verlet <: OrdinaryDiffEqAlgorithm end
 immutable SymplecticEuler <: OrdinaryDiffEqAlgorithm end
-#immutable VelocityVerlet <: OrdinaryDiffEqAdaptiveAlgorithm end
+immutable VelocityVerlet <: OrdinaryDiffEqAlgorithm end
+immutable Ruth3 <: OrdinaryDiffEqAlgorithm end
 
 immutable SplitEuler <: OrdinaryDiffEqAlgorithm end
 
@@ -23,6 +24,7 @@ immutable SplitEuler <: OrdinaryDiffEqAlgorithm end
   tableau::TabType=ODE_DEFAULT_TABLEAU
 end
 
+immutable SSPRK432 <: OrdinaryDiffEqAdaptiveAlgorithm end
 immutable BS3 <: OrdinaryDiffEqAdaptiveAlgorithm end
 immutable BS5 <: OrdinaryDiffEqAdaptiveAlgorithm end
 immutable DP5 <: OrdinaryDiffEqAdaptiveAlgorithm end

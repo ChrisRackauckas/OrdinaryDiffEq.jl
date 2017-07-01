@@ -48,11 +48,13 @@ function init{algType<:OrdinaryDiffEqAlgorithm,recompile_flag}(
     save_everystep = save_timeseries
   end
 
-  if typeof(prob)<:Union{PartitionedODEProblem,PartitionedConstrainedODEProblem}
+  if typeof(prob.f)<:Tuple
     if min((mm != I for mm in prob.mass_matrix)...)
       error("This solver is not able to use mass matrices.")
     end
-  elseif !(typeof(prob)<:Union{DiscreteProblem,Rosenbrock23,Rosenbrock32}) && prob.mass_matrix != I
+  elseif !(typeof(prob)<:DiscreteProblem) &&
+         !(typeof(alg) <: Union{Rosenbrock23,Rosenbrock32}) &&
+         prob.mass_matrix != I
     error("This solver is not able to use mass matrices.")
   end
 
@@ -62,7 +64,7 @@ function init{algType<:OrdinaryDiffEqAlgorithm,recompile_flag}(
 
   t = tspan[1]
 
-  if (!(typeof(alg) <: OrdinaryDiffEqAdaptiveAlgorithm) && !(typeof(alg) <: OrdinaryDiffEqCompositeAlgorithm)) && dt == tType(0) && isempty(tstops)
+  if ((!(typeof(alg) <: OrdinaryDiffEqAdaptiveAlgorithm) && !(typeof(alg) <: OrdinaryDiffEqCompositeAlgorithm)) || !adaptive) && dt == tType(0) && isempty(tstops)
       error("Fixed timestep methods require a choice of dt or choosing the tstops")
   end
 
@@ -108,13 +110,8 @@ function init{algType<:OrdinaryDiffEqAlgorithm,recompile_flag}(
 
   order = alg_order(alg)
 
-  if typeof(u) <: Union{Number,AbstractArray,ArrayPartition}
-    uEltypeNoUnits = typeof(recursive_one(u))
-    tTypeNoUnits   = typeof(recursive_one(t))
-  else
-    uEltypeNoUnits = recursive_eltype(u./u)
-    tTypeNoUnits   = recursive_eltype(t./t)
-  end
+  uEltypeNoUnits = typeof(one(uEltype))
+  tTypeNoUnits   = typeof(one(tType))
 
   if typeof(alg) <: Discrete
     abstol_internal = zero(u)
@@ -136,18 +133,21 @@ function init{algType<:OrdinaryDiffEqAlgorithm,recompile_flag}(
     reltol_internal = reltol
   end
 
+  dtmax > zero(dtmax) && tdir < 0 && (dtmax *= tdir) # Allow positive dtmax, but auto-convert
+  # dtmin is all abs => does not care about sign already.
   if dt == zero(dt) && adaptive
     dt = tType(ode_determine_initdt(u,t,tdir,dtmax,abstol_internal,reltol_internal,internalnorm,prob,order))
+    if sign(dt)!=tdir && dt!=tType(0)
+      error("Automatic dt setting has the wrong sign. Exiting. Please report this error.")
+    end
+  elseif adaptive && dt > zero(dt) && tdir < 0
+    dt *= tdir # Allow positive dt, but auto-convert
   end
 
-  if sign(dt)!=tdir && dt!=tType(0)
-    error("dt has the wrong sign. Exiting")
-  end
-
-  if typeof(u) <: Union{AbstractArray,Tuple}
-    rate_prototype = similar(u/zero(t),indices(u)) # rate doesn't need type info
+  if isinplace(prob) && typeof(u) <: AbstractArray && eltype(u) <: Number # Could this be more efficient for other arrays?
+    rate_prototype = similar(u,typeof(oneunit(uEltype)/oneunit(tType)))
   else
-    rate_prototype = u/zero(t)
+    rate_prototype = u./oneunit(tType)
   end
   rateType = typeof(rate_prototype) ## Can be different if united
 
@@ -207,7 +207,7 @@ function init{algType<:OrdinaryDiffEqAlgorithm,recompile_flag}(
     saveiter_dense = 0
   end
 
-  opts = DEOptions(Int(maxiters),timeseries_steps,save_everystep,adaptive,abstol_internal,
+  opts = DEOptions(maxiters,timeseries_steps,save_everystep,adaptive,abstol_internal,
     reltol_internal,tTypeNoUnits(gamma),tTypeNoUnits(qmax),tTypeNoUnits(qmin),
     tType(dtmax),tType(dtmin),internalnorm,save_idxs,
     tstops_internal,saveat_internal,d_discontinuities_internal,

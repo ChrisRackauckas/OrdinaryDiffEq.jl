@@ -2,7 +2,8 @@ __precompile__()
 
 module OrdinaryDiffEq
 
-  using DiffEqBase
+  using Reexport
+  @reexport using DiffEqBase
 
   using Compat
 
@@ -12,8 +13,10 @@ module OrdinaryDiffEq
   # Internal utils
   import DiffEqBase: realtype, ODE_DEFAULT_NORM, ODE_DEFAULT_ISOUTOFDOMAIN, ODE_DEFAULT_PROG_MESSAGE, ODE_DEFAULT_UNSTABLE_CHECK
 
-  using Parameters, GenericSVD, ForwardDiff, InplaceOps, RecursiveArrayTools,
-        NLsolve, Juno, Calculus, Roots, DataStructures, Iterators
+  import RecursiveArrayTools: chain
+
+  using Parameters, GenericSVD, ForwardDiff, RecursiveArrayTools,
+        NLsolve, Juno, Calculus, Roots, DataStructures
 
   import Base: linspace
 
@@ -27,6 +30,10 @@ module OrdinaryDiffEq
                      terminate!,get_du, get_dt,get_proposed_dt,set_proposed_dt!,
                      u_modified!,savevalues!,add_tstop!,add_saveat!,set_reltol!,
                      set_abstol!
+
+  macro tight_loop_macros(ex)
+   :($(esc(ex)))
+  end
 
   include("misc_utils.jl")
   include("algorithms.jl")
@@ -79,7 +86,7 @@ module OrdinaryDiffEq
   # Reexport the Alg Types
 
   export OrdinaryDiffEqAlgorithm, OrdinaryDiffEqAdaptiveAlgorithm, OrdinaryDiffEqCompositeAlgorithm,
-        Discrete, FunctionMap, Euler, Midpoint, SSPRK22, SSPRK33, SSPRK104, RK4, ExplicitRK, BS3, BS5,
+        Discrete, FunctionMap, Euler, Midpoint, SSPRK22, SSPRK33, SSPRK432, SSPRK104, RK4, ExplicitRK, BS3, BS5,
         DP5, DP5Threaded, Tsit5, DP8, Vern6, Vern7, Vern8, TanYam7, TsitPap8, Vern9, ImplicitEuler,
         Trapezoid, Rosenbrock23, Rosenbrock32, Feagin10, Feagin12, Feagin14,
         CompositeAlgorithm
@@ -88,7 +95,7 @@ module OrdinaryDiffEq
 
   export LawsonEuler, NorsettEuler
 
-  export SymplecticEuler
+  export SymplecticEuler, VelocityVerlet, Ruth3
 
   #export Verlet, VelocityVerlet
 
